@@ -1,0 +1,108 @@
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: cf_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: cfadmin
+      MONGO_INITDB_ROOT_PASSWORD: cfpassword
+      MONGO_INITDB_DATABASE: circuitforge
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/init.js
+    networks:
+      - cf_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: cf_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass cfredispass
+    volumes:
+      - redis_data:/data
+    networks:
+      - cf_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: cf_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # MinIO Console UI
+    environment:
+      MINIO_ROOT_USER: cfminiouser
+      MINIO_ROOT_PASSWORD: cfminiopassword
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - cf_network
+
+  # MinIO bucket setup — runs once on first start
+  minio_setup:
+    image: minio/mc:latest
+    container_name: cf_minio_setup
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        sleep 3;
+        mc alias set cf http://minio:9000 cfminiouser cfminiopassword;
+        mc mb --ignore-existing cf/documents;
+        mc mb --ignore-existing cf/exports;
+        mc mb --ignore-existing cf/imports;
+        mc mb --ignore-existing cf/assets;
+        mc mb --ignore-existing cf/thumbnails;
+        mc anonymous set download cf/exports;
+        exit 0;
+      "
+    networks:
+      - cf_network
+
+  # MongoDB UI — optional but useful in dev
+  mongo_express:
+    image: mongo-express:latest
+    container_name: cf_mongo_express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: cfadmin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: cfpassword
+      ME_CONFIG_MONGODB_URL: mongodb://cfadmin:cfpassword@mongodb:27017/
+      ME_CONFIG_BASICAUTH: false
+    depends_on:
+      - mongodb
+    networks:
+      - cf_network
+
+  # Redis UI — optional
+  redis_commander:
+    image: rediscommander/redis-commander:latest
+    container_name: cf_redis_commander
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:cfredispass
+    depends_on:
+      - redis
+    networks:
+      - cf_network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  minio_data:
+
+networks:
+  cf_network:
+    driver: bridge
+    name: cf_network
