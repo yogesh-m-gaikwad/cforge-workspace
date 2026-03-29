@@ -1,16 +1,5 @@
 {
-  "folders": [
-    { "path": "cforge-core" },
-    { "path": "cforge-gateway" },
-    { "path": "cforge-nestjs" },
-    { "path": "cforge-go" },
-    { "path": "cforge-springboot" },
-    { "path": "cforge-dotnet" },
-    { "path": "cforge-express" },
-    { "path": "cforge-rust" },
-    { "path": "cforge-ruby" },
-    { "path": "circuit-ide" },
-  ],
+  "folders": [{ "path": "." }],
   "settings": {
     "editor.formatOnSave": true,
     "files.exclude": {
